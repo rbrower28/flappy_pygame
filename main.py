@@ -29,9 +29,9 @@ import random           # variable elements positioning and textures
 
 # constants
 # [bp] use caps for const values
-DISPLAY_WIDTH  = 576
-DISPLAY_HEIGHT = 1024
-FPS = 120   # frames per second
+DISPLAY_WIDTH  = 640
+DISPLAY_HEIGHT = 480
+FPS = 60   # frames per second
 FONT_SIZE = 50
 FONT_ANTIALIAS = False
 SOUND_FREQ = 44100
@@ -39,13 +39,14 @@ SOUND_SIZE = -16
 SOUND_CHANNELS = 2
 SOUND_BUFFER = 512
 COLOR_RGB = [255, 255, 255]
-SCORE_X = DISPLAY_WIDTH/2
-SCORE_Y = 100
+COLOR_GOLD = [241, 241, 129]
+SCORE_X = DISPLAY_WIDTH - 80
+SCORE_Y = 60
 HIGHSCORE_Y = 850
 
-FLOOR_HEIGHT = 900
+FLOOR_HEIGHT = 420
 FLOOR_SPEED = 1
-GRAVITY_COEFF = 0.25    # gravity acceleration
+GRAVITY_COEFF = 0.35    # gravity acceleration
 BIRD_START_X = 100
 BIRD_START_Y = DISPLAY_HEIGHT/2
 BIRD_START_SPEED = -10
@@ -54,10 +55,10 @@ BIRD_FLAP_POWER = 7     # how strong is the bird's flap. decrease to make game e
 BIRD_FLAP_FREQ = 300    #flapping animation speed
 BIRD_DISPLAY_TOLERANCE = 100
 PIPE_START_X = DISPLAY_WIDTH + 200
-PIPE_HEIGHTS = [400, 600, 800]  # possible pipes heights variations
-PIPE_MARGIN = 300   # the clearance between the pipes
-PIPE_SPEED = 5
-PIPE_FREQ = 1200    # pipes spawning frequency (in ms)
+PIPE_HEIGHTS = [240, 280, 320, 360]  # possible pipes heights variations
+PIPE_MARGIN = 180   # the clearance between the pipes
+PIPE_SPEED = 4
+PIPE_FREQ = 1100    # pipes spawning frequency (in ms)
 
 SPAWNPIPE_EVT = pygame.USEREVENT    # custom event to spawn a pipe
 BIRD_FLAP_EVT = pygame.USEREVENT+1  # custom event to spawn a pipe
@@ -143,8 +144,8 @@ def draw_score():
     screen.blit(score_surface, score_rect)  # [demo] origin of the surfaces is the top left
 
 def draw_highscore():
-    highscore_surface = game_font.render(f'High Score: {int(high_score)}', FONT_ANTIALIAS, COLOR_RGB)    # [demo] use f-string to compose a title
-    highscore_rect = highscore_surface.get_rect(center = (SCORE_X, HIGHSCORE_Y))
+    highscore_surface = game_font.render(f'{int(high_score)}', FONT_ANTIALIAS, COLOR_GOLD)    # [demo] use f-string to compose a title
+    highscore_rect = highscore_surface.get_rect(center = (80, SCORE_Y))
     screen.blit(highscore_surface, highscore_rect)  # [demo] origin of the surfaces is the top left
 
 # renewing the game
@@ -207,8 +208,8 @@ game_font = pygame.font.Font('assets/04B_19.TTF', FONT_SIZE)
 # import an asset as surface -> scale/transform -> overlay with rect if needed -> put/blip on screen
 
 # background image and the floor as a surfaces. we double the size for the given screen
-bg_surface = pygame.transform.scale2x(pygame.image.load('assets/background-day.png').convert())
-floor_surface = pygame.transform.scale2x(pygame.image.load('assets/base.png').convert())
+bg_surface = pygame.transform.scale(pygame.image.load('assets/background-day.png').convert(), (DISPLAY_WIDTH, DISPLAY_HEIGHT*2))
+floor_surface = pygame.transform.scale(pygame.image.load('assets/base.png').convert(), (672, 140))
 floor_x = 0
 
 # the bird surface
@@ -224,14 +225,14 @@ pygame.time.set_timer(BIRD_FLAP_EVT, BIRD_FLAP_FREQ)
 # the pipes surface
 # we will use a list of pipe rects to be populated and drawn at a defined frequency
 # [wip] fix all pipes in the list changing colors at once
-pipe_surfaces = [pygame.transform.scale2x(pygame.image.load('assets/pipe-red.png').convert()),
-                pygame.transform.scale2x(pygame.image.load('assets/pipe-green.png').convert())]
+pipe_surfaces = [pygame.transform.scale(pygame.image.load('assets/pipe-red.png').convert(), (70, 340)),
+                pygame.transform.scale(pygame.image.load('assets/pipe-green.png').convert(), (70, 340,))]
 pipe_rect_list = []
 pygame.time.set_timer(SPAWNPIPE_EVT, PIPE_FREQ) # here we define a timer within the game engine
 
 # greeting/game over surface
-greeting_surface = pygame.transform.scale2x(pygame.image.load('assets/message.png').convert_alpha())
-greeting_rect = greeting_surface.get_rect(center = (DISPLAY_WIDTH/2, DISPLAY_HEIGHT/2))
+greeting_surface = pygame.transform.scale(pygame.image.load('assets/message.png').convert_alpha(), (260, 380))
+greeting_rect = greeting_surface.get_rect(center = (DISPLAY_WIDTH/2, DISPLAY_HEIGHT*0.45))
 
 flap_sound = pygame.mixer.Sound('sound/sfx_wing.wav')
 game_score_sound = pygame.mixer.Sound('sound/sfx_point.wav')
@@ -289,7 +290,7 @@ async def main():
         #
 
         # place background: this will be static and not redrawn in the game loop
-        screen.blit(bg_surface, (0,0))  # [demo] origin of the surfaces is the top left, rectangle geometry will place the surface
+        screen.blit(bg_surface, (0,-(DISPLAY_HEIGHT*2/3)))  # [demo] origin of the surfaces is the top left, rectangle geometry will place the surface
 
 
         # the game  will have two modes: .... [wip]
