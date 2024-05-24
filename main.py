@@ -1,102 +1,83 @@
-##!/usr/bin/env python
-'''
-    @author [mst]
-    @file   main.py
-    @brief  <title or quick description>
-    pygame learning using pygame
-    based on: https://youtu.be/UZg49z76cLw
-    this uses pygame. install with: pip install pygame
+"""
+    FLAPPY BIRD
+    Remake of the classic game, optimized as a
+    port for Miyoo Mini & Miyoo Mini Plus (OnionOS)
 
-    log:
-    -2022.02.25 asynced and packed with pygbag
-                -issues running in browser: FAILED
-                attempted to run with a pyinstaller exe: FAILED
-    -2021.01.10 games mechanics, high scores and reset
-    -2021.01.02 random pipes generation
-    -2020.12.25 canvas, blips, rectangles
-    -2020.12.07 init
-    -[wip] ooptimize
+    Forked from:
+    https://github.com/bbhitec/flappy_pygame
 
+    Changes made by:
+    https://github.com/rbrower28
 
-    @version 0.1 2023.02
-'''
+    Changes:
+    - reformat for MM aspect ratio
+    - conversion to python2 compatibility
 
-import asyncio          # packaging async
-import pygame           # main game lib
-from sys import exit    # system utils (exit)
-import random           # variable elements positioning and textures
+    Up Next:
+    - Alternate day and night background
+    - Alternate bird color
+    - Alternate pipe color
+"""
 
+import pygame
+from sys import exit
+import random
 
-# constants
-# [bp] use caps for const values
-DISPLAY_WIDTH  = 576
-DISPLAY_HEIGHT = 1024
-FPS = 120   # frames per second
-FONT_SIZE = 50
-FONT_ANTIALIAS = False
-SOUND_FREQ = 44100
-SOUND_SIZE = -16
-SOUND_CHANNELS = 2
-SOUND_BUFFER = 512
-COLOR_RGB = [255, 255, 255]
-SCORE_X = DISPLAY_WIDTH/2
-SCORE_Y = 100
-HIGHSCORE_Y = 850
+############ CONST
+DISPLAY_WIDTH  = 640
+DISPLAY_HEIGHT = 480
+FPS = 60
+SCORE_X = DISPLAY_WIDTH - 80
+SCORE_Y = 60
 
-FLOOR_HEIGHT = 900
+FLOOR_HEIGHT = 420
 FLOOR_SPEED = 1
-GRAVITY_COEFF = 0.25    # gravity acceleration
+GRAVITY_COEFF = 0.35    # acceleration from gravity
 BIRD_START_X = 100
 BIRD_START_Y = DISPLAY_HEIGHT/2
 BIRD_START_SPEED = -10
 BIRD_ROTATION_COEFF = 3 # bird surface rotation sensitivity
-BIRD_FLAP_POWER = 7     # how strong is the bird's flap. decrease to make game easier :)
-BIRD_FLAP_FREQ = 300    #flapping animation speed
+BIRD_FLAP_POWER = 7     # bird flap strength. decrease to make game easier
+BIRD_FLAP_FREQ = 300    # flap animation speed
 BIRD_DISPLAY_TOLERANCE = 100
 PIPE_START_X = DISPLAY_WIDTH + 200
-PIPE_HEIGHTS = [400, 600, 800]  # possible pipes heights variations
-PIPE_MARGIN = 300   # the clearance between the pipes
-PIPE_SPEED = 5
-PIPE_FREQ = 1200    # pipes spawning frequency (in ms)
+PIPE_HEIGHTS = [240, 280, 320, 360]
+PIPE_MARGIN = 180   # space between the pipes
+PIPE_SPEED = 4
+PIPE_FREQ = 1100    # pipes spawning frequency (in ms)
 
-SPAWNPIPE_EVT = pygame.USEREVENT    # custom event to spawn a pipe
-BIRD_FLAP_EVT = pygame.USEREVENT+1  # custom event to spawn a pipe
+SPAWNPIPE_EVT = pygame.USEREVENT
+BIRD_FLAP_EVT = pygame.USEREVENT + 1
 
-############
-# game mechanics related variables
-#
+############ global vars
 gravity = GRAVITY_COEFF
 bird_speed = BIRD_START_SPEED
 game_active = False # indicate a un-halted game
 game_score = 0
-high_score = 0  # [wip] load from a saved value
+high_score = 0
 
-# to make a continuous floor, we make two floor surfaces move alternately
+# to make a continuous floor, we make two floor surfaces move together
 def draw_floor():
     screen.blit(floor_surface, (floor_x,FLOOR_HEIGHT))
     screen.blit(floor_surface, (floor_x+DISPLAY_WIDTH,FLOOR_HEIGHT))
 
-# different bird animation surfaces are loaded as a list
-# and are changed via a user timer event
+# different bird frames are kept as a list
+# and changed via a timed event
 def bird_animation():
     global bird_flap_index
-    bird_flap_index = (bird_flap_index + 1) % 3 # arbitrate flapping animation surfaces
+    bird_flap_index = (bird_flap_index + 1) % 3 # repeat frames
     new_bird_surface = bird_flaps[bird_flap_index]
-    new_bird_rect = new_bird_surface.get_rect(center = (BIRD_START_X, bird_rect.centery))  # this will draw a rectangle around the bird surface
+    new_bird_rect = new_bird_surface.get_rect(center = (BIRD_START_X, bird_rect.centery))
     return new_bird_surface, new_bird_rect
 
-# surfaces rotation will lower its quality so we rotate and create a new surface each time
-# [wip] make a lambda function for this
 def rotate_bird(bird_surface):
     global bird_speed
-
-    rotation_angle = -bird_speed * BIRD_ROTATION_COEFF # we will let the bird speed determine the rotation angle
+    rotation_angle = -bird_speed * BIRD_ROTATION_COEFF
     new_surface = pygame.transform.rotozoom(bird_surface,rotation_angle,1)
     return new_surface
 
 def draw_bird(bird_rotated):
     screen.blit(bird_rotated, bird_rect)
-
 
 def move_pipes(pipe_rect_list_a):
     for pipe_rect in pipe_rect_list_a:
@@ -104,9 +85,9 @@ def move_pipes(pipe_rect_list_a):
     return pipe_rect_list_a
 
 def draw_pipes(pipe_rect_list_a):
-    global pipe_surface # [wip] parametrize this correctly
+    global pipe_surface
     for pipe_rect in pipe_rect_list_a:
-        if pipe_rect.top < 0:   # flip the upper pipe texture, spot it by rect boundary
+        if pipe_rect.top < 0:
             pipe_surface_l = pygame.transform.flip(pipe_surface, False, True)
         else:
             pipe_surface_l = pipe_surface
@@ -115,51 +96,51 @@ def draw_pipes(pipe_rect_list_a):
 def create_pipe():
     global pipe_surface
     pipe_height = random.choice(PIPE_HEIGHTS)
-    pipe_surface = random.choice(pipe_surfaces) # [wip] this changes all pipes texture, make individual
-    bottom_pipe = pipe_surface.get_rect(midtop = (PIPE_START_X, pipe_height)) # place by midtop
-    upper_pipe = pipe_surface.get_rect(midbottom = (PIPE_START_X, pipe_height - PIPE_MARGIN)) # place at midbottom
-    return bottom_pipe, upper_pipe  # the two pipes are returned as a tuple
+    pipe_surface = random.choice(pipe_surfaces)
+    bottom_pipe = pipe_surface.get_rect(midtop = (PIPE_START_X, pipe_height))
+    upper_pipe = pipe_surface.get_rect(midbottom = (PIPE_START_X, pipe_height - PIPE_MARGIN))
+    return bottom_pipe, upper_pipe
 
-# check birds-pipes collision for game over
+# check bird-pipe collision
 def check_collisions(pipe_rect_list_a):
-    # check display boundaries
     if bird_rect.top <= -BIRD_DISPLAY_TOLERANCE or bird_rect.bottom >= FLOOR_HEIGHT:
         die_sound.play()
         return False
-
     for pipe in pipe_rect_list_a:
-        # use rectangles for collision control.
-        # [bp][wip] costly. dont overuse. consider using a simple pipes heights bounds logic
         if bird_rect.colliderect(pipe):
             collision_sound.play()
             return False
-    return True  #no collision detected
+    return True
 
 # render score as text and draw as a surface
-# [wip] single score printing function, parametrized by game state
 def draw_score():
-    score_surface = game_font.render(str(game_score), FONT_ANTIALIAS, COLOR_RGB)
+    global game_font
+    global game_score
+    score_surface = game_font.render(str(game_score), False, [255, 255, 255]) # white
     score_rect = score_surface.get_rect(center = (SCORE_X, SCORE_Y))
-    screen.blit(score_surface, score_rect)  # [demo] origin of the surfaces is the top left
+    screen.blit(score_surface, score_rect)
 
 def draw_highscore():
-    highscore_surface = game_font.render(f'High Score: {int(high_score)}', FONT_ANTIALIAS, COLOR_RGB)    # [demo] use f-string to compose a title
-    highscore_rect = highscore_surface.get_rect(center = (SCORE_X, HIGHSCORE_Y))
-    screen.blit(highscore_surface, highscore_rect)  # [demo] origin of the surfaces is the top left
+    global game_font
+    global high_score
+    highscore_surface = game_font.render(str(high_score), False, [241, 241, 129]) # gold
+    highscore_rect = highscore_surface.get_rect(center = (80, SCORE_Y))
+    screen.blit(highscore_surface, highscore_rect)
 
 # renewing the game
 def reset_game():
-    global bird_speed    # reset bird movement
+    global bird_speed
     bird_speed = BIRD_START_SPEED
 
-    global game_score   # reset the running score
+    global game_score
     game_score = 0
 
+    global pipe_rect_list
     bird_rect.center = (BIRD_START_X, BIRD_START_Y)
-    pipe_rect_list.clear()  # clear all the pipes at start of game
+    pipe_rect_list = []
 
     global game_active
-    game_active = True  # re-launch the game
+    game_active = True
 
 def update_highscore():
     global game_score
@@ -167,71 +148,42 @@ def update_highscore():
     if (game_score > high_score):
         high_score = game_score
 
-# user exits game functionality:
 def exit_app():
     pygame.quit()
-    exit()  # terminating the game engine is not enough. we must also quit the app itself
+    exit()
 
-
-############
-# pygame related variables
-
-# pre-initializing audio engine sampling for optimization
-pygame.mixer.pre_init(SOUND_FREQ, SOUND_SIZE, SOUND_CHANNELS, SOUND_BUFFER)
-
- # [demo] the game engine works as follows:
-# init (+define a screen) -> paint a canvas -> main game loop (logic, user input, screen update) -> quit
-#
+############ PYGAME
+pygame.mixer.pre_init(44100, -16, 2, 512) # audio presets
 pygame.init()
-
-# create a screen (canvas)
 screen = pygame.display.set_mode((DISPLAY_WIDTH, DISPLAY_HEIGHT))
-
-# set a clock for frame rate control
+pygame.display.set_caption("Flappy Bird")
+pygame.font.init()
+game_font = pygame.font.Font('assets/04B_19.TTF', 50) # src & size
 clock = pygame.time.Clock()
 
-# [demo] working with text is:
-# set font -> render text -> create a surface -> put on screen
-game_font = pygame.font.Font('assets/04B_19.TTF', FONT_SIZE)
-
-
-
-
-############
-# importing assets
-# [demo] we can have many surfaces that can be displayed on a single display surface
-# [demo] we use.convert() to convert an image to a more efficient format
-# [demo] we use convert_alpha() to avoid black pixels during rotation/animation
-# [demo] for better collision control, we will use rect to engulf the graphics in geometric shapes
-# [demo] drawing on a screen goes as follows:
-# import an asset as surface -> scale/transform -> overlay with rect if needed -> put/blip on screen
-
-# background image and the floor as a surfaces. we double the size for the given screen
-bg_surface = pygame.transform.scale2x(pygame.image.load('assets/background-day.png').convert())
-floor_surface = pygame.transform.scale2x(pygame.image.load('assets/base.png').convert())
+############ ASSETS
+bg_surface = pygame.transform.scale(pygame.image.load('assets/background-day.png').convert(), (DISPLAY_WIDTH, DISPLAY_HEIGHT*2))
+floor_surface = pygame.transform.scale(pygame.image.load('assets/base.png').convert(), (672, 140))
 floor_x = 0
 
-# the bird surface
-# we will use timer-based flapping animation with different surfaces
+# bird animation
 bird_flaps = [pygame.transform.scale2x(pygame.image.load('assets/bluebird-downflap.png').convert_alpha()),
               pygame.transform.scale2x(pygame.image.load('assets/bluebird-midflap.png').convert_alpha()),
               pygame.transform.scale2x(pygame.image.load('assets/bluebird-upflap.png').convert_alpha())]
 bird_flap_index = 0
 bird_surface =  bird_flaps[bird_flap_index]
-bird_rect = bird_surface.get_rect(center = (BIRD_START_X, BIRD_START_Y))  # this will draw a rectangle around the bird surface
+bird_rect = bird_surface.get_rect(center = (BIRD_START_X, BIRD_START_Y))
 pygame.time.set_timer(BIRD_FLAP_EVT, BIRD_FLAP_FREQ)
 
-# the pipes surface
-# we will use a list of pipe rects to be populated and drawn at a defined frequency
-# [wip] fix all pipes in the list changing colors at once
-pipe_surfaces = [pygame.transform.scale2x(pygame.image.load('assets/pipe-red.png').convert()),
-                pygame.transform.scale2x(pygame.image.load('assets/pipe-green.png').convert())]
+# the pipe textures
+pipe_surfaces = [pygame.transform.scale(pygame.image.load('assets/pipe-red.png').convert(), (70, 340)),
+                pygame.transform.scale(pygame.image.load('assets/pipe-green.png').convert(), (70, 340,))]
 pipe_rect_list = []
-pygame.time.set_timer(SPAWNPIPE_EVT, PIPE_FREQ) # here we define a timer within the game engine
+pygame.time.set_timer(SPAWNPIPE_EVT, PIPE_FREQ)
 
 # greeting/game over surface
-greeting_surface = pygame.transform.scale2x(pygame.image.load('assets/message.png').convert_alpha())
-greeting_rect = greeting_surface.get_rect(center = (DISPLAY_WIDTH/2, DISPLAY_HEIGHT/2))
+greeting_surface = pygame.transform.scale(pygame.image.load('assets/message.png').convert_alpha(), (260, 380))
+greeting_rect = greeting_surface.get_rect(center = (DISPLAY_WIDTH/2, DISPLAY_HEIGHT*0.45))
 
 flap_sound = pygame.mixer.Sound('sound/sfx_wing.wav')
 game_score_sound = pygame.mixer.Sound('sound/sfx_point.wav')
@@ -243,14 +195,13 @@ def action():
     global bird_speed
     global game_active
     if game_active:
-        bird_speed = 0   # halt gravity effect upon a flap
+        bird_speed = 0
         bird_speed -= BIRD_FLAP_POWER
         flap_sound.play()
     else:
         reset_game()
 
-async def main():
-    # [wip] make a game class and move vars there
+def main():
     global game_active
     global pipe_rect_list
     global floor_x
@@ -259,83 +210,51 @@ async def main():
     global gravity
     global bird_rect
 
-    ############
-    # main game loop
-    #
-    # [wip] change to: while not game_end
+    ############ main loop
     while True:
-
-        ############
-        # watch for events throughout the main loop
-        #
-        for event in pygame.event.get():    # we can capture any event (mouse movement, times, buttons)
-            if event.type == pygame.QUIT:
-                exit_app()
-            if event.type == pygame.KEYDOWN:    # map key press handlers
-                if event.key == pygame.K_SPACE:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:   # A btn (Miyoo Mini)
                     action()
-                if event.key == pygame.K_ESCAPE:    # escape key
+                if event.key == pygame.K_ESCAPE:    # Menu btn (Miyoo Mini)
                     exit_app()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                action()
-            if event.type == SPAWNPIPE_EVT:  # handle custom events
-                pipe_rect_list.extend(create_pipe())  # add generated pipes tuple to the list
+            if event.type == SPAWNPIPE_EVT:
+                pipe_rect_list.extend(create_pipe())
             if event.type == BIRD_FLAP_EVT:
                 bird_surface, bird_rect = bird_animation()
 
-        ############
-        # placing assets
-        # [wip] export all to sub functions?
-        #
+        screen.blit(bg_surface, (0,-(DISPLAY_HEIGHT*2/3)))
 
-        # place background: this will be static and not redrawn in the game loop
-        screen.blit(bg_surface, (0,0))  # [demo] origin of the surfaces is the top left, rectangle geometry will place the surface
-
-
-        # the game  will have two modes: .... [wip]
-        # elements in an active game
         if (game_active):
-            # placing the bird
-            bird_speed += gravity    # move the bird, maintain falling acceleration
+            # update bird
+            bird_speed += gravity
             bird_rect.centery += bird_speed
-            bird_rotated = rotate_bird(bird_surface)    # bird rotation animation
-            draw_bird(bird_rotated) # finally, draw the moving, rotated bird
+            bird_rotated = rotate_bird(bird_surface)
+            draw_bird(bird_rotated)
 
             game_active = check_collisions(pipe_rect_list)
 
-            # placing the pipes
-            # [wip] parametrize this list properly
+            # update pipes
             pipe_rect_list = move_pipes(pipe_rect_list)
             draw_pipes(pipe_rect_list)
 
-            # placing the score
-            game_score +=1  # [wip] option: count score as pipes passed, add the sound [here] ...
-            #game_score_sound.play()
+            game_score +=1
         else:
             update_highscore()
-            draw_highscore()    # inactive game screen will show the high score
+            draw_highscore()
             screen.blit(greeting_surface, greeting_rect)
 
         draw_score()
 
-        # placing the floor (it comes after the pipes so it will be drawn above)
-        # the floor will be moving regardless the game state
-        # [wip] move to function?
+        # floor movements
         floor_x -= FLOOR_SPEED
-        # reset moving floor
         if (floor_x <= -DISPLAY_WIDTH):
             floor_x = 0
-        # [debug] print ("floor_x: " + str(floor_x))
         draw_floor()
 
-
-        ############
-        # redraw the canvas
-        #
-        pygame.display.update()
-        # set frame rate. some complex games may require frame limiting
+        # end frame
+        pygame.display.flip()
         clock.tick(FPS)
-        await asyncio.sleep(0)
 
-asyncio.run(main())
-# pygame.quit()
+if __name__ == '__main__':
+    main()
